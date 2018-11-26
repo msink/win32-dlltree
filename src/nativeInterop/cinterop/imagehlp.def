@@ -1,0 +1,5 @@
+package = platform.windows.imagehlp
+headers = windows.h imagehlp.h
+headerFilter = imagehlp.h
+compilerOpts = -D_WIN32_WINNT=0x501
+linkerOpts = -limagehlp
