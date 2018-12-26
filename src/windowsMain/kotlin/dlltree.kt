@@ -10,28 +10,29 @@ class DllTree(
     val path: List<String>
 ) {
     var arch = -1
-    val root = Node(name)
+    val root = Module(name)
+
     init {
         root.BuildTree()
     }
 
-    inner class Node(
-        val module: String
+    inner class Module(
+        val name: String
     ) {
-        var resolved_module: String? = null
+        var resolved_name: String? = null
         var mapped_address: COpaquePointer? = null
-        val childs = mutableListOf<Node>()
+        val childs = mutableListOf<Module>()
         var visited = false
         var unresolved = false
         var processed = false
     }
 
-    fun Node.BuildTree(): Boolean = memScoped {
+    fun Module.BuildTree(): Boolean = memScoped {
         if (processed) return true
 
         val img = alloc<_LOADED_IMAGE>()
         fun TryMapAndLoad(path: String?): Boolean {
-            val succeed= MapAndLoad(module, path, img.ptr, TRUE, TRUE) == TRUE
+            val succeed = MapAndLoad(name, path, img.ptr, TRUE, TRUE) == TRUE
             if (succeed && arch != -1 && img.FileHeader!!.pointed.FileHeader.Machine.toInt() != arch) {
                 UnMapAndLoad(img.ptr)
                 return false
@@ -52,7 +53,7 @@ class DllTree(
         if (arch == -1)
             arch = img.FileHeader!!.pointed.FileHeader.Machine.toInt()
 
-        resolved_module = img.ModuleName?.toKString()
+        resolved_name = img.ModuleName?.toKString()
         mapped_address = img.MappedAddress
         processed = true
 
@@ -83,9 +84,9 @@ class DllTree(
             return null
         }
 
-        fun Node.FindDll(name: String): Node? {
+        fun Module.FindDll(name: String): Module? {
             childs.forEach {
-                if (it.module.equals(name, ignoreCase = true))
+                if (it.name.equals(name, ignoreCase = true))
                     return it
             }
             childs.forEach {
@@ -96,10 +97,10 @@ class DllTree(
             return null
         }
 
-        fun Node.ProcessDll(addr: DWORD): Node? {
+        fun Module.ProcessDll(addr: DWORD): Module? {
             val name = MapPointer(addr)?.toKString() ?: return null
             return root.FindDll(name) ?: run {
-                Node(name).also { childs.add(it) }
+                Module(name).also { childs.add(it) }
             }.also {
                 it.BuildTree()
             }
@@ -138,15 +139,14 @@ class DllTree(
         }
 
         UnMapAndLoad(img.ptr)
-
         return true
     }
 
-    fun Node.print() {
+    fun Module.print() {
         if (unresolved || visited)
             return
         visited = true
-        println(resolved_module)
+        println(resolved_name)
         childs.forEach { it.print() }
     }
 
